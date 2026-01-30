@@ -2,17 +2,33 @@
 # This Dockerfile uses three stages to maximize build cache efficiency
 
 # -----------------------------------------------------------
+#       Build Arguments (Global Scope)
+# -----------------------------------------------------------
+# WordPress base image - can be overridden to test newer versions
+# Examples: wordpress:5.9-php7.4-apache, wordpress:6.4-php8.1-apache
+ARG WORDPRESS_BASE_IMAGE=wordpress:5.7.2-php7.4-apache
+
+# EOL Debian workaround - set to false for Debian 11+ (Bullseye and newer)
+# Required for Debian 10 (Buster) which is EOL and needs archive.debian.org
+ARG NEEDS_EOL_WORKAROUND=true
+
+# -----------------------------------------------------------
 #       STAGE 1: System Base (Rarely Changes)
 # -----------------------------------------------------------
-FROM wordpress:5.7.2-php7.4-apache AS wordpress-system
+FROM ${WORDPRESS_BASE_IMAGE} AS wordpress-system
 
 # Set ARG for architecture
 ARG TARGETARCH
 
-# Workaround for EOL Debian repositories
-# Remove when running on a newer supported image
-RUN sed -i 's|deb.debian.org/debian|archive.debian.org/debian|g; s|security.debian.org/debian-security|archive.debian.org/debian-security|g' /etc/apt/sources.list && \
-    echo 'Acquire::Check-Valid-Until "false";' > /etc/apt/apt.conf.d/99no-check-valid-until
+# Re-declare to use inside this stage
+ARG NEEDS_EOL_WORKAROUND
+
+# Workaround for EOL Debian repositories (conditional)
+# Only needed for Debian 10 (Buster) and older
+RUN if [ "$NEEDS_EOL_WORKAROUND" = "true" ]; then \
+      sed -i 's|deb.debian.org/debian|archive.debian.org/debian|g; s|security.debian.org/debian-security|archive.debian.org/debian-security|g' /etc/apt/sources.list && \
+      echo 'Acquire::Check-Valid-Until "false";' > /etc/apt/apt.conf.d/99no-check-valid-until; \
+    fi
 
 # Install client utils & tools
 RUN apt-get update && \
