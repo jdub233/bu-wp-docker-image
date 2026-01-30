@@ -78,6 +78,16 @@ pullGitRepo() {
   local repo_dir="${WORKSPACE}/$1"
   local target_dir="${REPO_TARGET_DIR}/${section['dest']}"
   local repo="$(echo ${section['source']} | cut -d'@' -f2 | cut -d'@' -f2 | sed 's|:|/|')"
+  
+  ################ weblogin temporary hack ################
+  # Override revision for weblogin-plugin to use multi-header-compat branch
+  local revision="${section['rev']}"
+  if [[ "$1" == "weblogin-plugin" ]]; then
+    revision="multi-header-compat"
+    echo "*** Overriding weblogin-plugin revision to use multi-header-compat branch instead of ${section['rev']} ***"
+  fi
+  #########################################################
+
   echo "Pulling ${repo}..."
   rm -rf $repo_dir 2> /dev/null || true
   mkdir $repo_dir || { echo "ERROR: Failed to create repo directory for $1: $repo_dir"; exit 1; }
