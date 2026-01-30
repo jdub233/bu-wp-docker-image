@@ -97,7 +97,7 @@ pullGitRepo() {
     cd $repo_dir || { echo "ERROR: Failed to cd into repo directory: $repo_dir"; exit 1; }
     git init || { echo "ERROR: git init failed for repo $1 (${repo})"; exit 1; }
     git remote add origin https://${GIT_USER}:${GIT_PAT}@${repo} || { echo "ERROR: git remote add failed for repo $1 (${repo})"; exit 1; }
-    git fetch --depth 1 origin ${section['rev']} || { echo "ERROR: git fetch failed for repo $1 (${repo}) at rev ${section['rev']} - check that revision exists and GIT_USER/GIT_PAT are valid"; exit 1; }
+    git fetch --depth 1 origin ${revision} || { echo "ERROR: git fetch failed for repo $1 (${repo}) at rev ${revision} - check that revision exists and GIT_USER/GIT_PAT are valid"; exit 1; }
     git archive --format=tar FETCH_HEAD | (cd $target_dir && tar xf -) || { echo "ERROR: git archive or extraction failed for repo $1 (${repo})"; exit 1; }
   ) || exit 1
 }
