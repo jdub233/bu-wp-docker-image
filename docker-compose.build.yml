@@ -1,0 +1,21 @@
+# Build configuration for BU WordPress
+# This file is focused solely on building the combined WordPress image
+
+version: '3.9'
+
+services:
+  wordpress-build:
+    build:
+      context: .
+      dockerfile: wordpress-build/Dockerfile
+      args:
+        # Base image configuration
+        WORDPRESS_BASE_IMAGE: ${WORDPRESS_BASE_IMAGE:-wordpress:5.7.2-php7.4-apache}
+        NEEDS_EOL_WORKAROUND: ${NEEDS_EOL_WORKAROUND:-true}
+        # WordPress code fetching
+        GIT_USER: ${GIT_USER}
+        GIT_PAT: ${GIT_PAT}
+        MANIFEST_INI_FILE: ${MANIFEST_INI_FILE}
+        REPOS: ${REPOS}
+        CACHEBUST: ${CACHEBUST:-1}
+    image: bu-wordpress:${TAG:-latest}

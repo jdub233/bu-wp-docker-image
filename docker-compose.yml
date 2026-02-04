@@ -1,0 +1,128 @@
+# Complete local development environment for BU WordPress
+# Includes database, WordPress, S3 proxy, and Redis services
+
+services:
+  db:
+    image: mariadb:latest
+    restart: always
+    volumes:
+      - db_data:/var/lib/mysql
+    environment:
+      MYSQL_DATABASE: wordpress
+      MYSQL_USER: wordpress
+      MYSQL_PASSWORD: ${WORDPRESS_DB_PASSWORD:-password}
+      MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD:-rootpassword}
+    ports:
+      - "3306:3306"
+    networks:
+      - wp-network
+
+  wordpress:
+    # If DOCKER_REGISTRY is set, pull the image from there; otherwise, use the locally built image
+    image: ${DOCKER_REGISTRY:+$DOCKER_REGISTRY/}bu-wordpress:${TAG:-latest}
+    depends_on:
+      - db
+      - s3proxy
+      - redis
+    restart: always
+    ports:
+      - "80:80"
+      ##- "443:443"
+    hostname: ${WP_HOSTNAME:-wordpress.local}
+    environment:
+      WORDPRESS_DB_HOST: db:3306
+      WORDPRESS_DB_USER: wordpress
+      WORDPRESS_DB_PASSWORD: ${WORDPRESS_DB_PASSWORD:-password}
+      WORDPRESS_DB_NAME: wordpress
+      WORDPRESS_DEBUG: ${WORDPRESS_DEBUG:-0}
+      SERVER_NAME: ${WP_HOSTNAME:-wordpress.local}
+      HTTP_HOST: ${WP_HOSTNAME:-wordpress.local}
+      SP_ENTITY_ID: ${SP_ENTITY_ID:-https://*.kualitest.research.bu.edu/shibboleth}
+      IDP_ENTITY_ID: ${IDP_ENTITY_ID:-https://shib-test.bu.edu/idp/shibboleth}
+      SHIB_IDP_LOGOUT: ${SHIB_IDP_LOGOUT:-https://shib-test.bu.edu/idp/logout.jsp}
+      SHIB_SP_KEY: ${SHIB_SP_KEY}
+      SHIB_SP_CERT: ${SHIB_SP_CERT}
+      S3PROXY_HOST: http://s3proxy:8080
+      FORWARDED_FOR_HOST: ${FORWARDED_FOR_HOST:-localhost}
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      TZ: America/New_York
+      MULTISITE: true
+      XDEBUG: ${XDEBUG:-false}
+      WP_CLI_ALLOW_ROOT: true
+      # S3 WordPress config
+      WORDPRESS_CONFIG_EXTRA: |
+        define('MULTISITE', true);
+        define('SUBDOMAIN_INSTALL', false);
+        define( 'S3_UPLOADS_BUCKET', '${S3_UPLOADS_BUCKET}');
+        define( 'S3_UPLOADS_REGION', '${S3_UPLOADS_REGION}');
+        define( 'S3_UPLOADS_SECRET', '${S3_UPLOADS_SECRET_ACCESS_KEY}');
+        define( 'S3_UPLOADS_KEY', '${S3_UPLOADS_ACCESS_KEY_ID}');
+        define( 'ACCESS_RULES_TABLE', '${ACCESS_RULES_TABLE}');
+        define( 'S3_UPLOADS_OBJECT_ACL', null);
+        define( 'S3_UPLOADS_AUTOENABLE', true );
+        define( 'S3_UPLOADS_DISABLE_REPLACE_UPLOAD_URL', true);
+        define( 'BU_INCLUDES_PATH', '/var/www/html/bu-includes' );
+    volumes:
+      - wp_build:/var/www/html
+    networks:
+      - wp-network
+
+  s3proxy:
+    image: public.ecr.aws/bostonuniversity-nonprod/aws-sigv4-proxy
+    restart: always
+    command: 
+      - "-v"
+      - "--name"
+      - "s3-object-lambda"
+      - "--region"
+      - "${OLAP_REGION:-us-east-1}"
+      - "--no-verify-ssl"
+      - "--host"
+      - "${OLAP}-${OLAP_ACCT_NBR}.s3-object-lambda.${OLAP_REGION:-us-east-1}.amazonaws.com"
+    environment:
+      healthcheck_path: '/s3proxy-healthcheck'
+      AWS_ACCESS_KEY_ID: ${S3_UPLOADS_ACCESS_KEY_ID}
+      AWS_SECRET_ACCESS_KEY: ${S3_UPLOADS_SECRET_ACCESS_KEY}
+      REGION: ${S3_UPLOADS_REGION:-us-east-1}
+    networks:
+      - wp-network
+
+  redis:
+    image: redis:alpine
+    restart: always
+    ports:
+      - "6379:6379"
+    networks:
+      - wp-network
+  shibsp:
+    image: 037860335094.dkr.ecr.us-east-2.amazonaws.com/bu-shibboleth-sp:latest 
+    container_name: sp
+    environment:
+      TZ: UTC
+      DOMAIN: ${WP_HOSTNAME:-wordpress.local}
+      ENTITY_ID: ${ENTITY_ID}
+      IDP_CERT: ${IDP_CERT} 
+      ENTRY_POINT: ${ENTRY_POINT}
+      LOGOUT_URL: ${LOGOUT_URL}
+      SAML_CERT: ${SAML_CERT}
+      SAML_PK: ${SAML_PK}
+      APP_AUTHORIZATION: true ## this should always be true, see shibsp readme
+      APP_LOGIN_HEADER: ${APP_LOGIN_HEADER:-SHIB-HANDLER}
+      APP_LOGOUT_HEADER: ${APP_LOGOUT_HEADER:-SHIB-IDP-LOGOUT}
+      DOCKER_SP_PORT: "443"
+      DOCKER_APP_PORT: "80"
+      DOCKER_APP_HOST: wordpress
+    ports:
+      - '443:443'
+      - '9229:9229'
+    depends_on:
+      - wordpress
+
+networks:
+  wp-network:
+    driver: bridge
+
+volumes:
+  db_data:
+  wp_build:
