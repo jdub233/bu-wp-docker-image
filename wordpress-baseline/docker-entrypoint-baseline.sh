@@ -100,7 +100,16 @@ if [ "${SHELL:-}" == 'true' ] ; then
   tail -f /dev/null
 else
 
-  check_wordpress_install
+  # JOB_PROCESSOR_MODE: Ephemeral containers running WP-CLI job processing tasks.
+  # Skip WordPress installation check to avoid slow multisite-install in ephemeral mode.
+  # Database is already initialized by persistent WordPress containers.
+  # All other setup is preserved because:
+  #   - check_mu_plugin_loader: site-manager plugin loads through MU loader
+  #   - setup_redis: Jobs need Redis for cache flushing operations
+  #   - setVirtualHost: WP-CLI needs multisite URL context
+  if [ "${JOB_PROCESSOR_MODE:-}" != 'true' ] ; then
+    check_wordpress_install
+  fi
 
   check_mu_plugin_loader
 
