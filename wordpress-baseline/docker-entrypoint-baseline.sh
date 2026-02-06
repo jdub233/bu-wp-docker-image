@@ -112,6 +112,14 @@ else
   if [ "${JOB_PROCESSOR_MODE:-}" == 'true' ] ; then
     WP_PATH="/usr/src/wordpress"
     
+    # Fix hardcoded /var/www/html paths in WORDPRESS_CONFIG_EXTRA environment variable.
+    # The wp-config.php uses getenv_docker() to read this at runtime, so we must fix
+    # the environment variable itself, not the config file.
+    if [ -n "${WORDPRESS_CONFIG_EXTRA:-}" ]; then
+      echo "Fixing paths in WORDPRESS_CONFIG_EXTRA for job processor mode..."
+      export WORDPRESS_CONFIG_EXTRA=$(echo "$WORDPRESS_CONFIG_EXTRA" | sed 's|/var/www/html|/usr/src/wordpress|g')
+    fi
+    
     # Job mode needs wp-config.php but parent entrypoint skips creation for WP-CLI commands.
     # Generate it from wp-config-docker.php template if WORDPRESS_* env vars are present.
     cd "$WP_PATH"
@@ -127,11 +135,6 @@ else
           }
           { print }
         ' wp-config-docker.php > wp-config.php
-        
-        # Fix hardcoded /var/www/html paths in WORDPRESS_CONFIG_EXTRA (BU_INCLUDES_PATH, etc.)
-        # since files remain in /usr/src/wordpress in job mode. BU_INCLUDES_PATH is a bad idea and should be unwound eventually.
-        echo "Fixing paths in wp-config.php for job processor mode..."
-        sed -i 's|/var/www/html|/usr/src/wordpress|g' wp-config.php
       fi
     fi
   else
