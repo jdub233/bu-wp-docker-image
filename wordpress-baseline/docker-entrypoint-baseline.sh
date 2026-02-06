@@ -127,6 +127,11 @@ else
           }
           { print }
         ' wp-config-docker.php > wp-config.php
+        
+        # Fix hardcoded /var/www/html paths in WORDPRESS_CONFIG_EXTRA (BU_INCLUDES_PATH, etc.)
+        # since files remain in /usr/src/wordpress in job mode. BU_INCLUDES_PATH is a bad idea and should be unwound eventually.
+        echo "Fixing paths in wp-config.php for job processor mode..."
+        sed -i 's|/var/www/html|/usr/src/wordpress|g' wp-config.php
       fi
     fi
   else
