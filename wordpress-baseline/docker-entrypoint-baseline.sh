@@ -111,6 +111,24 @@ else
   # because parent entrypoint only copies files when running Apache/PHP-FPM.
   if [ "${JOB_PROCESSOR_MODE:-}" == 'true' ] ; then
     WP_PATH="/usr/src/wordpress"
+    
+    # Job mode needs wp-config.php but parent entrypoint skips creation for WP-CLI commands.
+    # Generate it from wp-config-docker.php template if WORDPRESS_* env vars are present.
+    cd "$WP_PATH"
+    if [ ! -s wp-config.php ] && [ -n "${WORDPRESS_DB_HOST:-}" ]; then
+      if [ -s wp-config-docker.php ]; then
+        echo "Creating wp-config.php from environment variables for job processor..."
+        awk '
+          /put your unique phrase here/ {
+            cmd = "head -c1m /dev/urandom | sha1sum | cut -d\\  -f1"
+            cmd | getline str
+            close(cmd)
+            gsub("put your unique phrase here", str)
+          }
+          { print }
+        ' wp-config-docker.php > wp-config.php
+      fi
+    fi
   else
     WP_PATH="/var/www/html"
   fi
