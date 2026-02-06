@@ -17,15 +17,18 @@ uninitialized_baseline() {
   [ -n "$(grep 'localhost' $WORDPRESS_CONF)" ] && true || false
 }
 
-MU_PLUGIN_LOADER='/var/www/html/wp-content/mu-plugins/loader.php'
 check_mu_plugin_loader() {
-  if [ -f $MU_PLUGIN_LOADER ] ; then
+  # Use WP_PATH set in main execution block (defaults to /var/www/html if not set)
+  local wp_path="${WP_PATH:-/var/www/html}"
+  local mu_plugin_loader="${wp_path}/wp-content/mu-plugins/loader.php"
+  
+  if [ -f "$mu_plugin_loader" ] ; then
     echo "mu_plugin_loader already generated..."
   else
     echo "generate_mu_plugin_loader..."
     wp bu-core generate-mu-plugin-loader \
-      --path=/var/www/html \
-      --require=/var/www/html/wp-content/mu-plugins/bu-core/src/wp-cli.php
+      --path="$wp_path" \
+      --require="${wp_path}/wp-content/mu-plugins/bu-core/src/wp-cli.php"
   fi
 }
 
@@ -46,22 +49,25 @@ check_wordpress_install() {
 }
 
 setup_redis() {
+  # Use WP_PATH set in main execution block (defaults to /var/www/html if not set)
+  local wp_path="${WP_PATH:-/var/www/html}"
+  
   # If there is a REDIS_HOST and REDIS_PORT available in the environment, add them as wp config values.
   if [ -n "${REDIS_HOST:-}" ] && [ -n "${REDIS_PORT:-}" ] ; then
     echo "Redis host detected, setting up Redis..."
-    wp config set WP_REDIS_HOST $REDIS_HOST --add --type=constant
-    wp config set WP_REDIS_PORT $REDIS_PORT --add --type=constant
+    wp config set WP_REDIS_HOST $REDIS_HOST --add --type=constant --path="$wp_path"
+    wp config set WP_REDIS_PORT $REDIS_PORT --add --type=constant --path="$wp_path"
 
     # If there is a REDIS_PASSWORD available in the environment, add it as a wp config value.
     if [ -n "${REDIS_PASSWORD:-}" ] ; then
-      wp config set WP_REDIS_PASSWORD $REDIS_PASSWORD --add --type=constant
+      wp config set WP_REDIS_PASSWORD $REDIS_PASSWORD --add --type=constant --path="$wp_path"
     fi
 
     # If the redis-cache plugin is available, create the object-cache.php file and network activate the plugin.
-    if wp plugin is-installed redis-cache ; then
+    if wp plugin is-installed redis-cache --path="$wp_path" ; then
       echo "redis-cache plugin detected, setting up object cache..."
-      wp plugin activate redis-cache
-      wp redis update-dropin
+      wp plugin activate redis-cache --path="$wp_path"
+      wp redis update-dropin --path="$wp_path"
     fi
 
   fi
@@ -101,7 +107,15 @@ if [ "${SHELL:-}" == 'true' ] ; then
 else
 
   # JOB_PROCESSOR_MODE: Ephemeral containers running WP-CLI job processing tasks.
-  # Skip WordPress installation check to avoid slow multisite-install in ephemeral mode.
+  # In job mode, WordPress files remain in /usr/src/wordpress (never copied to /var/www/html)
+  # because parent entrypoint only copies files when running Apache/PHP-FPM.
+  if [ "${JOB_PROCESSOR_MODE:-}" == 'true' ] ; then
+    WP_PATH="/usr/src/wordpress"
+  else
+    WP_PATH="/var/www/html"
+  fi
+
+  # Skip WordPress installation check in job mode to avoid slow multisite-install.
   # Database is already initialized by persistent WordPress containers.
   # All other setup is preserved because:
   #   - check_mu_plugin_loader: site-manager plugin loads through MU loader
