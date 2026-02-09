@@ -61,15 +61,15 @@ fi
 # Pull the manifest repo from github.
 pullManifestRepo() {
   local repo_dir="${WORKSPACE}/${MANIFEST_DIRNAME}"
-  echo "Pulling github.com/bu-ist/wp-manifests.git..."
+  echo "Pulling github.com/jdub233/wp-manifests.git..."
   rm -rf $repo_dir 2> /dev/null || true
   mkdir $repo_dir || { echo "ERROR: Failed to create manifest repo directory: $repo_dir"; exit 1; }
   (
     set -e
     cd $repo_dir || { echo "ERROR: Failed to cd into manifest repo directory: $repo_dir"; exit 1; }
     git init || { echo "ERROR: git init failed for wp-manifests repo"; exit 1; }
-    git remote add origin https://${GIT_USER}:${GIT_PAT}@github.com/bu-ist/wp-manifests.git || { echo "ERROR: git remote add failed for wp-manifests repo"; exit 1; }
-    git pull --depth 1 origin master || { echo "ERROR: git pull failed for wp-manifests repo - check GIT_USER, GIT_PAT, and network connectivity"; exit 1; }
+    git remote add origin https://${GIT_USER}:${GIT_PAT}@github.com/jdub233/wp-manifests.git || { echo "ERROR: git remote add failed for wp-manifests repo"; exit 1; }
+    git pull --depth 1 origin testing4 || { echo "ERROR: git pull failed for wp-manifests repo - check GIT_USER, GIT_PAT, and network connectivity"; exit 1; }
   ) || exit 1
 }
 
