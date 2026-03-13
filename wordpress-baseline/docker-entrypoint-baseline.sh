@@ -117,7 +117,7 @@ else
     # the environment variable itself, not the config file.
     if [ -n "${WORDPRESS_CONFIG_EXTRA:-}" ]; then
       echo "Fixing paths in WORDPRESS_CONFIG_EXTRA for job processor mode..."
-      export WORDPRESS_CONFIG_EXTRA=$(echo "$WORDPRESS_CONFIG_EXTRA" | sed 's|/var/www/html|/usr/src/wordpress|g')
+      export WORDPRESS_CONFIG_EXTRA="$(echo "$WORDPRESS_CONFIG_EXTRA" | sed 's|/var/www/html|/usr/src/wordpress|g')"
     fi
     
     # Job mode needs wp-config.php but parent entrypoint skips creation for WP-CLI commands.
