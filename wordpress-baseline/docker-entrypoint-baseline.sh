@@ -55,12 +55,12 @@ setup_redis() {
   # If there is a REDIS_HOST and REDIS_PORT available in the environment, add them as wp config values.
   if [ -n "${REDIS_HOST:-}" ] && [ -n "${REDIS_PORT:-}" ] ; then
     echo "Redis host detected, setting up Redis..."
-    wp config set WP_REDIS_HOST $REDIS_HOST --add --type=constant --path="$wp_path"
-    wp config set WP_REDIS_PORT $REDIS_PORT --add --type=constant --path="$wp_path"
+    wp config set WP_REDIS_HOST "$REDIS_HOST" --add --type=constant --path="$wp_path"
+    wp config set WP_REDIS_PORT "$REDIS_PORT" --add --type=constant --path="$wp_path"
 
     # If there is a REDIS_PASSWORD available in the environment, add it as a wp config value.
     if [ -n "${REDIS_PASSWORD:-}" ] ; then
-      wp config set WP_REDIS_PASSWORD $REDIS_PASSWORD --add --type=constant --path="$wp_path"
+      wp config set WP_REDIS_PASSWORD "$REDIS_PASSWORD" --add --type=constant --path="$wp_path"
     fi
 
     # If the redis-cache plugin is available, create the object-cache.php file and network activate the plugin.
