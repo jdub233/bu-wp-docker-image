@@ -90,8 +90,10 @@ COPY --chmod=766 wordpress-baseline/uploads.ini /usr/local/etc/php/conf.d/
 # Add S3 proxy configuration
 COPY --chmod=766 wordpress-baseline/s3proxy.conf /etc/apache2/sites-available/
 
-# Configure entrypoint script base
-RUN sed -i "/exec "$@"/i\source docker-entrypoint-baseline.sh \$@" /usr/local/bin/docker-entrypoint.sh
+# Inject baseline entrypoint before the official WordPress entrypoint's final exec
+# sed -i: edit in-place | '/pattern/': find line matching pattern | 'i\text': insert text before match
+# Single quotes prevent shell expansion of "$@" - we want sed to match the literal exec "$@" line
+RUN sed -i '/exec "$@"/i\source /usr/local/bin/docker-entrypoint-baseline.sh' /usr/local/bin/docker-entrypoint.sh
 
 # -----------------------------------------------------------
 #       STAGE 2: WordPress Code (Changes Frequently)
@@ -116,7 +118,7 @@ RUN apt update -y && \
 
 # Copy and run build script
 COPY wordpress-build/wp-build.sh /usr/local/bin/
-RUN bash /usr/local/bin/wp-build.sh 2>&1 | tee /tmp/repos/build-output.txt
+RUN bash -o pipefail -c 'bash /usr/local/bin/wp-build.sh 2>&1 | tee /tmp/repos/build-output.txt'
 
 # -----------------------------------------------------------
 #       STAGE 3: Final Assembly (Quick)
