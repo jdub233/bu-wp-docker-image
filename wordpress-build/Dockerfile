@@ -116,7 +116,7 @@ RUN apt update -y && \
 
 # Copy and run build script
 COPY wordpress-build/wp-build.sh /usr/local/bin/
-RUN bash /usr/local/bin/wp-build.sh 2>&1 | tee /tmp/repos/build-output.txt
+RUN set -o pipefail && bash /usr/local/bin/wp-build.sh 2>&1 | tee /tmp/repos/build-output.txt
 
 # -----------------------------------------------------------
 #       STAGE 3: Final Assembly (Quick)
