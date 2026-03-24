@@ -6,11 +6,11 @@
 # -----------------------------------------------------------
 # WordPress base image - can be overridden to test newer versions
 # Examples: wordpress:5.9-php7.4-apache, wordpress:6.4-php8.1-apache
-ARG WORDPRESS_BASE_IMAGE=wordpress:5.7.2-php7.4-apache
+ARG WORDPRESS_BASE_IMAGE=wordpress:5.8.3-php7.4-apache
 
 # EOL Debian workaround - set to false for Debian 11+ (Bullseye and newer)
 # Required for Debian 10 (Buster) which is EOL and needs archive.debian.org
-ARG NEEDS_EOL_WORKAROUND=true
+ARG NEEDS_EOL_WORKAROUND=false
 
 # -----------------------------------------------------------
 #       STAGE 1: System Base (Rarely Changes)
