@@ -110,10 +110,12 @@ ARG CACHEBUST=1
 # This line changes with every build when CACHEBUST is modified
 RUN echo "Cache bust: $CACHEBUST"
 
-# Install dependencies for WordPress code acquisition
+# Install dependencies for WordPress code acquisition.
+# Keep ca-certificates explicit: debian:*-slim has no CA bundle and subversion fails without it.
+
 RUN apt update -y && \
     apt upgrade -y && \
-    apt install git wget dos2unix xxd -y && \
+    apt install git subversion ca-certificates dos2unix xxd -y && \
     mkdir -p /tmp/repos
 
 # Copy and run build script

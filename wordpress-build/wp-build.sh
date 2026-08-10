@@ -94,77 +94,38 @@ pullGitRepo() {
   ) || exit 1
 }
 
+# Export an svn path at a pegged revision into the target directory.
+#
+# "source@rev" is a peg revision. Do not change it to "-r rev": that is an operative revision against
+# a HEAD peg, which resolves differently for a path deleted or replaced after rev.
+# --force is required because target_dir already exists.
 pullSvnRepo() {
-  local repo_dir="${WORKSPACE}/$1"
   export target_dir="${REPO_TARGET_DIR}/${section['dest']}"
-  local repo="${section['source']}?p=${section['rev']}"
-  echo "Pulling ${repo}..."
-  rm -rf $repo_dir 2> /dev/null || true
-  mkdir $repo_dir || { echo "ERROR: Failed to create repo directory for $1: $repo_dir"; exit 1; }
   mkdir -p $target_dir || { echo "ERROR: Failed to create target directory for $1: $target_dir"; exit 1; }
 
-  # Get the portion of the http address that has the protocol, domain, and any trailing "/" removed.
-  # Example: "https://plugins.svn.wordpress.org/akismet/tags/4.1.10/" becomes "akismet/tags/4.1.10"
-  local path=$(echo ${section['source']} \
-    | awk 'BEGIN {RS="/"} {if($1 != "") { if(NR>1) printf "\n"; printf $1}}' \
-    | tail -n +3 \
-    | tr '\n' '/')
+  # Guard only the values svn accepts but should not: an empty rev makes the URL "source@", which svn
+  # reads as an escaped literal @ and resolves at HEAD -- exit 0, full export, nothing pinned. HEAD is
+  # the same thing asked for explicitly. Both matter most on a trunk source, where rev is the only
+  # version pin (classic-editor at r2285151 is v1.5; trunk at HEAD is v1.7.0). A malformed rev needs
+  # no guard here; svn rejects it on its own.
+  case "${section['rev']}" in
+    ''|HEAD)
+      echo "ERROR: repo $1 has an unpinned svn rev ('${section['rev']}') - this would build the latest code, not a fixed revision"
+      exit 1
+      ;;
+  esac
 
-  # Get the domain portion of the http address
-  # Example: "https://plugins.svn.wordpress.org/akismet/tags/4.1.10/" becomes "plugins.svn.wordpress.org"
-  local domain=$(echo ${section['source']} \
-    | awk 'BEGIN {RS="/"} {if($1 != "") print $1}' \
-    | sed -n '2 p')
+  echo "Exporting ${section['source']}@${section['rev']}..."
+  svn export --force --quiet --non-interactive \
+    "${section['source']}@${section['rev']}" "$target_dir" \
+    || { echo "ERROR: svn export failed for repo $1 (${section['source']}) at r${section['rev']} - check that the path exists at that revision"; exit 1; }
 
-  echo "  SVN download path: ${domain}/${path}"
-  
-  # "Pull" just the revision (Make sure level=0, which allows for infinite recursion, as opposed to the default depth of 5)
-  # Use --tries=3 to retry on transient failures
-  echo "  Running wget (this may take a while for large repos)..."
-  wget -r --level 0 --tries=3 $repo --accept-regex=.*/${path}/.* --reject=index.html* 2>&1 | tail -5
-  
-  # Validate that files were actually downloaded (wget can exit with non-zero for non-critical errors like missing index.html)
-  echo "  Validating downloaded files..."
-  if [ ! -d "${domain}/${path}" ]; then
-    echo "ERROR: Download directory not found: ${domain}/${path}"
-    ls -la ${domain}/ 2>/dev/null || echo "  (${domain}/ directory does not exist)"
-    exit 1
-  fi
-  
-  local file_count=$(find "${domain}/${path}" -type f 2>/dev/null | wc -l)
+  local file_count=$(find "$target_dir" -type f 2>/dev/null | wc -l)
   if [ "$file_count" -eq 0 ]; then
-    echo "ERROR: wget failed for repo $1 (${repo}) - no files downloaded to ${domain}/${path}"
+    echo "ERROR: svn export produced no files for repo $1 (${section['source']}@${section['rev']})"
     exit 1
   fi
-  echo "  ✓ Downloaded $file_count files"
-
-  # Copy the content of the downloaded svn repo to the target directory.
-  # The querystring portion of the revision is retained by wget on the end of the file names, so also strip these off while copying.
-  function copyAndFilterSvnRepo() {
-    local src="$1"
-    if [ -d "$src" ] ; then
-      mkdir -p "$target_dir/$src" 2>/dev/null || true
-    else
-      [ "${src:0:2}" == './' ] && src=${src:2}
-      local dest="${target_dir}/${src}"
-      dest=$(echo "$dest" | cut -d'?' -f1)
-      mkdir -p "$(dirname "$dest")" 2>/dev/null || true
-      cp "$src" "$dest" 2>/dev/null || true
-    fi
-  }
-  export -f copyAndFilterSvnRepo
-
-  echo "  Copying files to target directory..."
-  (
-    set -e
-    cd "${domain}/${path}" || { echo "ERROR: Failed to cd into SVN download directory: ${domain}/${path}"; exit 1; }
-    find . -type f -exec bash -c "copyAndFilterSvnRepo \"{}\"" \;
-  )
-  if [ $? -ne 0 ]; then
-    echo "ERROR: SVN file copy/filter failed for repo $1"
-    exit 1
-  fi
-  echo "  ✓ Files copied successfully"
+  echo "  ✓ Exported $file_count files"
 }
 
 
