@@ -1,0 +1,5 @@
+# Ignore the .env file
+.env
+
+# Ignore files not ready to commit
+staging/*
