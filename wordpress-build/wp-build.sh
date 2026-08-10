@@ -178,7 +178,7 @@ processSingleRepo() {
       pullSvnRepo "${section['name']}"
       return $?
       ;;
-    default)
+    *)
       echo "ERROR: Unknown repo type: ${section['scm']} for ${section['name']}"
       return 1
       ;;
