@@ -88,11 +88,51 @@ includeS3ProxyConfig() {
 
 # Setup xdebug if the XDEBUG environment variable is set to 'true'.
 # This is currently customized for use with local docker and may be macOS specific.
+# Xdebug version compatibility: https://xdebug.org/docs/compat
 setup_xdebug() {
   if [ "${XDEBUG:-}" == 'true' ] ; then
-    if [ -z "$(pecl list | grep xdebug-3.1.6)" ] ; then
-      pecl install xdebug-3.1.6
+    # Detect PHP version to install compatible xdebug
+    PHP_VERSION=$(php -r 'echo PHP_VERSION;')
+    PHP_MAJOR_MINOR=$(echo $PHP_VERSION | cut -d. -f1-2)
+    
+    # Map PHP version to compatible xdebug version based on official compatibility table
+    case "$PHP_MAJOR_MINOR" in
+      7.2|7.3|7.4)
+        # PHP 7.2-7.4: Xdebug 3.1.x is the last version supporting PHP 7.x
+        XDEBUG_VERSION="3.1.6"
+        ;;
+      8.0|8.1)
+        # PHP 8.0-8.1: Xdebug 3.1.x still works, using for consistency
+        XDEBUG_VERSION="3.1.6"
+        ;;
+      8.2|8.3)
+        # PHP 8.2-8.3: Xdebug 3.3.x is stable and well-tested
+        XDEBUG_VERSION="3.3.2"
+        ;;
+      8.4|8.5)
+        # PHP 8.4+: Use latest xdebug 3.4.x
+        XDEBUG_VERSION=""  # Let PECL pick the latest
+        ;;
+      *)
+        # Unknown PHP version: try latest
+        echo "Warning: Unknown PHP version $PHP_MAJOR_MINOR, attempting latest xdebug..."
+        XDEBUG_VERSION=""
+        ;;
+    esac
+    
+    # Check if xdebug is already installed (any version)
+    if [ -z "$(pecl list | grep xdebug)" ] ; then
+      if [ -n "$XDEBUG_VERSION" ]; then
+        echo "Installing xdebug $XDEBUG_VERSION for PHP $PHP_MAJOR_MINOR..."
+        pecl install xdebug-$XDEBUG_VERSION
+      else
+        echo "Installing latest xdebug for PHP $PHP_MAJOR_MINOR..."
+        pecl install xdebug
+      fi
+    else
+      echo "Xdebug already installed: $(pecl list | grep xdebug)"
     fi
+    
     docker-php-ext-enable xdebug
     echo 'xdebug.start_with_request=yes' >> /usr/local/etc/php/php.ini
     echo 'xdebug.mode=debug' >> /usr/local/etc/php/php.ini
