@@ -9,9 +9,11 @@ services:
       context: .
       dockerfile: wordpress-build/Dockerfile
       args:
-        # Base image configuration
-        WORDPRESS_BASE_IMAGE: ${WORDPRESS_BASE_IMAGE:-wordpress:5.7.2-php7.4-apache}
-        NEEDS_EOL_WORKAROUND: ${NEEDS_EOL_WORKAROUND:-true}
+        # Base image configuration - defaults track the Dockerfile's own ARG defaults
+        WORDPRESS_BASE_IMAGE: ${WORDPRESS_BASE_IMAGE:-wordpress:5.8.3-php7.4-apache}
+        NEEDS_EOL_WORKAROUND: ${NEEDS_EOL_WORKAROUND:-false}
+        # Optional core pin - see docs/wordpress-core-pinning.md
+        WORDPRESS_CORE_VERSION: ${WORDPRESS_CORE_VERSION:-}
         # WordPress code fetching
         GIT_USER: ${GIT_USER}
         GIT_PAT: ${GIT_PAT}
