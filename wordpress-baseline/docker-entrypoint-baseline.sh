@@ -58,6 +58,13 @@ setup_redis() {
     wp config set WP_REDIS_HOST "$REDIS_HOST" --add --type=constant --path="$wp_path"
     wp config set WP_REDIS_PORT "$REDIS_PORT" --add --type=constant --path="$wp_path"
 
+    # phpredis is built with igbinary support, but the dropin needs this constant also
+    # before it will use igbinary. --raw writes a real boolean, not the string "true".
+    # Flush the object cache when changing this: the dropin calls igbinary_unserialize
+    # unconditionally, so entries in the other format warn and return NULL, which
+    # callers testing for false read as a cached null rather than a miss.
+    wp config set WP_REDIS_IGBINARY true --raw --add --type=constant --path="$wp_path"
+
     # If there is a REDIS_PASSWORD available in the environment, add it as a wp config value.
     if [ -n "${REDIS_PASSWORD:-}" ] ; then
       wp config set WP_REDIS_PASSWORD "$REDIS_PASSWORD" --add --type=constant --path="$wp_path"

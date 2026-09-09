@@ -89,12 +89,16 @@ RUN mkdir -p /usr/src/php/ext && \
     docker-php-ext-install igbinary
 
 # Install Redis extension with igbinary support
+# Unlike docker-php-ext-install (used above for igbinary), a raw make install builds
+# the extension without enabling it. Omit the enable and class Redis never exists, so
+# the redis-cache dropin silently falls back to its bundled Predis client.
 RUN cd /tmp && \
     git clone https://github.com/phpredis/phpredis.git && \
     cd phpredis && \
     phpize && \
     ./configure --enable-redis-igbinary && \
-    make && make install
+    make && make install && \
+    docker-php-ext-enable redis
 
 # Link Apache SSL logs to Docker stdout/stderr
 RUN ln -sf /dev/stdout /var/log/apache2/ssl-access.log && \
