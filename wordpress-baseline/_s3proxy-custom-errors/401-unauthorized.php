@@ -1,7 +1,7 @@
 <?php
 // mod_shib publishes a base URL that needs '/Login?target=' appended; the edge SP sends a complete
-// URL-encoded login URL to use verbatim. Check mod_shib first -- a viewer cannot set the subprocess
-// environment name, but can send the edge headers.
+// URL-encoded login URL to use verbatim. Check mod_shib first: its value comes from the subprocess
+// environment rather than from the request.
 $login_url = '';
 
 if ( ! empty( $_SERVER['Shib-Handler'] ) ) {
@@ -13,6 +13,17 @@ if ( ! empty( $_SERVER['Shib-Handler'] ) ) {
 			$login_url = urldecode( $_SERVER[ $edge_header ] );
 			break;
 		}
+	}
+}
+
+// The login target must stay on this host. A handler with no host is already a path on this site.
+if ( '' !== $login_url ) {
+	$login_host = parse_url( $login_url, PHP_URL_HOST );
+	$same_host  = ( null === $login_host )
+		|| ( is_string( $login_host ) && 0 === strcasecmp( $login_host, $_SERVER['HTTP_HOST'] ?? '' ) );
+
+	if ( ! $same_host ) {
+		$login_url = '';
 	}
 }
 
