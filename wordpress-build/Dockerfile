@@ -109,18 +109,18 @@ RUN ln -sf /dev/stdout /var/log/apache2/ssl-access.log && \
 RUN a2enmod auth_basic headers rewrite ssl proxy proxy_http env
 
 #   2) Copy and adjust files
-COPY --chmod=777 wordpress-baseline/docker-entrypoint-baseline.sh /usr/local/bin/
+COPY --chmod=755 wordpress-baseline/docker-entrypoint-baseline.sh /usr/local/bin/
 COPY wordpress-baseline/wordpress.conf /etc/apache2/sites-enabled/
 COPY wordpress-baseline/healthcheck.htm /usr/src/wordpress/
 RUN rm /etc/apache2/sites-enabled/000-default.conf
 
 # Add error pages, htaccess and PHP upload limits
-COPY --chmod=766 wordpress-baseline/_s3proxy-custom-errors /var/www/html/_s3proxy-custom-errors
-COPY --chmod=766 wordpress-baseline/.htaccess /var/www/html/
-COPY --chmod=766 wordpress-baseline/uploads.ini /usr/local/etc/php/conf.d/
+COPY --chmod=755 wordpress-baseline/_s3proxy-custom-errors /var/www/html/_s3proxy-custom-errors
+COPY --chmod=644 wordpress-baseline/.htaccess /var/www/html/
+COPY --chmod=644 wordpress-baseline/uploads.ini /usr/local/etc/php/conf.d/
 
 # Add S3 proxy configuration
-COPY --chmod=766 wordpress-baseline/s3proxy.conf /etc/apache2/sites-available/
+COPY --chmod=644 wordpress-baseline/s3proxy.conf /etc/apache2/sites-available/
 
 # Inject baseline entrypoint before the official WordPress entrypoint's final exec
 # sed -i: edit in-place | '/pattern/': find line matching pattern | 'i\text': insert text before match
