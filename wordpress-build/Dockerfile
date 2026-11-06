@@ -100,6 +100,44 @@ RUN cd /tmp && \
     make && make install && \
     docker-php-ext-enable redis
 
+# New Relic PHP agent, installed disabled. setup_newrelic in the baseline entrypoint
+# enables it at container start only when NEW_RELIC_ENABLED=true and
+# NEW_RELIC_LICENSE_KEY are both set, so an image without that env behaves as before.
+# The tarball checksum is computed from New Relic's download (they publish none); bump
+# both together. The agent .so is chosen by the PHP extension API number, which is the
+# trailing digits of extension_dir (e.g. no-debug-non-zts-20230831).
+ARG NEWRELIC_AGENT_VERSION=12.12.0.41
+ARG NEWRELIC_AGENT_SHA256=148e8773fc80ffd4bafb3aed99e0c84d72c7e101152cf10b7fccbed15f71ea80
+RUN set -eux; \
+    case "$TARGETARCH" in \
+      arm64) NR_ARCH=aarch64 ;; \
+      *)     NR_ARCH=x64 ;; \
+    esac; \
+    NR_PKG="newrelic-php5-${NEWRELIC_AGENT_VERSION}-linux"; \
+    curl -fsSL "https://download.newrelic.com/php_agent/archive/${NEWRELIC_AGENT_VERSION}/${NR_PKG}.tar.gz" -o /tmp/newrelic.tar.gz; \
+    echo "${NEWRELIC_AGENT_SHA256}  /tmp/newrelic.tar.gz" | sha256sum -c -; \
+    tar -xzf /tmp/newrelic.tar.gz -C /tmp; \
+    EXT_DIR="$(php -r 'echo ini_get("extension_dir");')"; \
+    API="$(basename "$EXT_DIR" | grep -oE '[0-9]+$')"; \
+    cp "/tmp/${NR_PKG}/agent/${NR_ARCH}/newrelic-${API}.so" "${EXT_DIR}/newrelic.so"; \
+    cp "/tmp/${NR_PKG}/daemon/newrelic-daemon.${NR_ARCH}" /usr/bin/newrelic-daemon; \
+    chmod 755 /usr/bin/newrelic-daemon; \
+    mkdir -p /var/log/newrelic && chmod 1777 /var/log/newrelic; \
+    { \
+      echo 'extension = newrelic.so'; \
+      echo 'newrelic.enabled = false'; \
+      echo 'newrelic.license = ""'; \
+      echo 'newrelic.appname = "WordPress"'; \
+      echo 'newrelic.distributed_tracing_enabled = true'; \
+      echo 'newrelic.span_events.max_samples_stored = 100'; \
+      echo 'newrelic.browser_monitoring.auto_instrument = true'; \
+      echo 'newrelic.daemon.location = /usr/bin/newrelic-daemon'; \
+      echo 'newrelic.daemon.logfile = /var/log/newrelic/newrelic-daemon.log'; \
+      echo 'newrelic.logfile = /var/log/newrelic/php_agent.log'; \
+    } > /usr/local/etc/php/conf.d/newrelic.ini; \
+    rm -rf /tmp/newrelic.tar.gz "/tmp/${NR_PKG}"; \
+    php -m | grep -qx newrelic
+
 # Link Apache SSL logs to Docker stdout/stderr
 RUN ln -sf /dev/stdout /var/log/apache2/ssl-access.log && \
     ln -sf /dev/stderr /var/log/apache2/ssl-error.log

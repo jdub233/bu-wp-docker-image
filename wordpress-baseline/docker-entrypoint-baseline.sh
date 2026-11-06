@@ -93,6 +93,57 @@ includeS3ProxyConfig() {
 }
 
 
+# Enable the New Relic PHP agent installed (disabled) by the Dockerfile.
+# Runs only when NEW_RELIC_ENABLED=true and NEW_RELIC_LICENSE_KEY is set (an ECS secret);
+# otherwise the agent stays disabled. This file is sourced by the official entrypoint,
+# which runs under `set -Eeuo pipefail`, so every command here must tolerate failure:
+# monitoring must never stop the container from starting. The key is never echoed.
+#   NEW_RELIC_APP_NAME  application name (default "WordPress")
+#   NEW_RELIC_LABELS    "key:value;key:value" entity labels (optional)
+setup_newrelic() {
+  local ini='/usr/local/etc/php/conf.d/newrelic.ini'
+
+  if [ ! -f "$ini" ]; then
+    return 0
+  fi
+
+  if [ "${NEW_RELIC_ENABLED:-}" != 'true' ] || [ -z "${NEW_RELIC_LICENSE_KEY:-}" ]; then
+    echo "New Relic agent disabled (NEW_RELIC_ENABLED and NEW_RELIC_LICENSE_KEY not both set)."
+    return 0
+  fi
+
+  local license appname labels
+  license="$(printf '%s' "$NEW_RELIC_LICENSE_KEY" | tr -d '[:space:]')" || license=''
+  case "$license" in
+    ''|*[!A-Za-z0-9]*)
+      echo "New Relic agent disabled: license key is empty or has unexpected characters."
+      return 0
+      ;;
+  esac
+  appname="${NEW_RELIC_APP_NAME:-WordPress}"
+  labels="${NEW_RELIC_LABELS:-}"
+
+  {
+    sed -i \
+      -e "s|^newrelic.enabled = .*|newrelic.enabled = true|" \
+      -e "s|^newrelic.license = .*|newrelic.license = \"${license}\"|" \
+      -e "s|^newrelic.appname = .*|newrelic.appname = \"${appname//[|\"]/}\"|" \
+      "$ini" &&
+    if [ -n "$labels" ]; then
+      echo "newrelic.labels = \"${labels//\"/}\"" >> "$ini"
+    fi &&
+    # Job tasks are short-lived: wait for the daemon to connect so the run is reported.
+    if [ "${JOB_PROCESSOR_MODE:-}" == 'true' ]; then
+      printf '%s\n' 'newrelic.daemon.start_timeout = "10s"' 'newrelic.daemon.app_connect_timeout = "10s"' >> "$ini"
+    fi &&
+    echo "New Relic agent enabled, appname=\"${appname}\"."
+  } || {
+    echo "New Relic agent setup failed; continuing without it."
+    sed -i "s|^newrelic.enabled = .*|newrelic.enabled = false|" "$ini" || true
+  }
+  return 0
+}
+
 # Setup xdebug if the XDEBUG environment variable is set to 'true'.
 # This is currently customized for use with local docker and may be macOS specific.
 # Xdebug version compatibility: https://xdebug.org/docs/compat
@@ -201,6 +252,8 @@ else
   check_mu_plugin_loader
 
   setup_redis
+
+  setup_newrelic
 
   # Configure S3 proxy if the config values are provided (assumes that if the bucket name is provided, the other config values are as well).
   if [ -n "${S3PROXY_HOST}" ]; then
