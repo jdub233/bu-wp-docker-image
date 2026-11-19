@@ -71,10 +71,17 @@ setup_redis() {
     fi
 
     # If the redis-cache plugin is available, create the object-cache.php file and network activate the plugin.
+    # Copy the dropin rather than run `wp redis update-dropin`, which also flushes all of Redis.
     if wp plugin is-installed redis-cache --path="$wp_path" ; then
       echo "redis-cache plugin detected, setting up object cache..."
       wp plugin activate redis-cache --path="$wp_path"
-      wp redis update-dropin --path="$wp_path"
+
+      local dropin_src="${wp_path}/wp-content/plugins/redis-cache/includes/object-cache.php"
+      local dropin_dst="${wp_path}/wp-content/object-cache.php"
+      if ! cmp -s "$dropin_src" "$dropin_dst" ; then
+        install -m 644 "$dropin_src" "$dropin_dst"
+        echo "Installed object cache drop-in (no flush)."
+      fi
     fi
 
   fi
